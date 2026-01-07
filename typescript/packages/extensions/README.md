@@ -510,9 +510,9 @@ verifySIWxSignature(payload, {
 
 Client helper that creates and signs a complete payload.
 
-#### `encodeSIWxHeader(payload)` / `encodeSIWxHeaderRaw(payload)`
+#### `encodeSIWxHeader(payload)`
 
-Encodes a payload for the SIGN-IN-WITH-X header.
+Encodes a payload as base64 for the SIGN-IN-WITH-X header.
 
 #### `SIGN_IN_WITH_X`
 
