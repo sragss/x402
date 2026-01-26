@@ -121,3 +121,15 @@ export {
   encodeBase58,
   extractSolanaChainReference,
 } from "./solana";
+
+// Storage
+export { type SIWxStorage, InMemorySIWxStorage } from "./storage";
+
+// Hooks
+export {
+  createSIWxSettleHook,
+  createSIWxRequestHook,
+  createSIWxClientHook,
+  type CreateSIWxHookOptions,
+  type SIWxHookEvent,
+} from "./hooks";
