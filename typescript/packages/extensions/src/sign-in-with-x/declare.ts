@@ -4,6 +4,7 @@
  * Helps servers declare SIWX authentication requirements in PaymentRequired responses.
  */
 
+import { randomBytes } from "crypto";
 import type { SIWxExtension, SIWxExtensionInfo, DeclareSIWxOptions, SignatureType } from "./types";
 import { SIGN_IN_WITH_X } from "./types";
 import { buildSIWxSchema } from "./schema";
@@ -48,17 +49,22 @@ function getSignatureType(network: string): SignatureType {
  * ```
  */
 export function declareSIWxExtension(options: DeclareSIWxOptions): Record<string, SIWxExtension> {
-  // Time-based fields will be populated by enrichDeclaration hook
+  // Generate time-based fields for standalone usage (tests, etc.)
+  // enrichDeclaration hook will override these per-request when extension is registered
+  const expirationSeconds = options.expirationSeconds ?? 300;
+  const nonce = randomBytes(16).toString("hex");
+  const issuedAt = new Date().toISOString();
+  const expirationTime = new Date(Date.now() + expirationSeconds * 1000).toISOString();
+
   const info: SIWxExtensionInfo = {
     domain: options.domain,
     uri: options.resourceUri,
     version: options.version ?? "1",
     chainId: options.network,
     type: getSignatureType(options.network),
-    // Placeholders - enrichDeclaration will replace these per-request:
-    nonce: "",
-    issuedAt: "",
-    expirationTime: "",
+    nonce,
+    issuedAt,
+    expirationTime,
     resources: [options.resourceUri],
   };
 

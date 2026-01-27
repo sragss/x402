@@ -193,9 +193,7 @@ export function createSIWxClientHook(signer: SIWxSigner) {
     const extensions = context.paymentRequired.extensions ?? {};
 
     // First try simple key (backward compatibility)
-    let siwxExtension = extensions[SIGN_IN_WITH_X] as
-      | { info: SIWxExtensionInfo }
-      | undefined;
+    let siwxExtension = extensions[SIGN_IN_WITH_X] as { info: SIWxExtensionInfo } | undefined;
 
     // If not found, search for namespaced key matching signer's chain type
     if (!siwxExtension?.info) {

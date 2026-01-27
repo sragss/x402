@@ -5,7 +5,7 @@
  */
 
 import { randomBytes } from "crypto";
-import type { ResourceServerExtension } from "@x402/core/types/extensions";
+import type { ResourceServerExtension } from "@x402/core/types";
 import type { SIWxExtension } from "./types";
 import { SIGN_IN_WITH_X } from "./types";
 
@@ -27,7 +27,7 @@ import { SIGN_IN_WITH_X } from "./types";
 export const siwxResourceServerExtension: ResourceServerExtension = {
   key: SIGN_IN_WITH_X,
 
-  enrichDeclaration: (declaration) => {
+  enrichDeclaration: (declaration: unknown) => {
     const extension = declaration as SIWxExtension & { _metadata?: { expirationSeconds?: number } };
 
     // Refresh time-based fields per request to prevent expiration
