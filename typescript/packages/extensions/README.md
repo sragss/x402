@@ -484,9 +484,21 @@ declareSIWxExtension({
   network: string;               // CAIP-2 network (e.g., "eip155:8453")
   statement?: string;            // Human-readable purpose
   version?: string;              // CAIP-122 version (default: "1")
-  expirationSeconds?: number;    // Expiration duration in seconds (default: 300 = 5 minutes)
+  expirationSeconds?: number;    // Expiration duration (300 = 5 min, undefined = infinite)
   signatureScheme?: SignatureScheme;  // Hint for client
 })
+```
+
+**Expiration Examples:**
+```typescript
+// Short-lived (5 minutes) - high-security resources
+declareSIWxExtension({ ..., expirationSeconds: 300 })
+
+// Long-lived (30 days) - subscription-like access
+declareSIWxExtension({ ..., expirationSeconds: 30 * 24 * 60 * 60 })
+
+// Infinite - once paid, access forever
+declareSIWxExtension({ ..., expirationSeconds: undefined })
 ```
 
 #### `parseSIWxHeader(header)`

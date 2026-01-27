@@ -34,17 +34,27 @@ export const siwxResourceServerExtension: ResourceServerExtension = {
     const nonce = randomBytes(16).toString("hex");
     const issuedAt = new Date().toISOString();
 
-    // Use metadata expirationSeconds if available, otherwise default to 5 minutes
-    const expirationSeconds = extension._metadata?.expirationSeconds ?? 300;
-    const expirationTime = new Date(Date.now() + expirationSeconds * 1000).toISOString();
+    // Calculate expirationTime based on configured duration
+    // undefined = infinite expiration (omit expirationTime field)
+    const expirationSeconds = extension._metadata?.expirationSeconds;
+    const expirationTime =
+      expirationSeconds !== undefined
+        ? new Date(Date.now() + expirationSeconds * 1000).toISOString()
+        : undefined;
+
+    const info: Record<string, unknown> = {
+      ...extension.info,
+      nonce,
+      issuedAt,
+    };
+
+    // Only include expirationTime if defined (allows infinite expiration)
+    if (expirationTime !== undefined) {
+      info.expirationTime = expirationTime;
+    }
 
     return {
-      info: {
-        ...extension.info,
-        nonce,
-        issuedAt,
-        expirationTime,
-      },
+      info,
       schema: extension.schema,
     };
   },

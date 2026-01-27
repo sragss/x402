@@ -147,7 +147,10 @@ export interface DeclareSIWxOptions {
    */
   network: `eip155:${string}` | `solana:${string}` | (string & {});
   /**
-   * Optional expiration duration in seconds (default: 300 = 5 minutes).
+   * Optional expiration duration in seconds.
+   * - Number (e.g., 300): Signature expires after this many seconds
+   * - undefined: Infinite expiration (no expirationTime field in wire format)
+   *
    * The actual expirationTime timestamp is generated per-request by enrichDeclaration hook.
    */
   expirationSeconds?: number;

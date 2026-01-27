@@ -44,17 +44,16 @@ function getSignatureType(network: string): SignatureType {
  *   resourceUri: 'https://api.example.com/data',
  *   network: 'eip155:8453',
  *   statement: 'Sign in to access your purchased content',
- *   expirationSeconds: 300, // Optional: 5 minutes (default)
+ *   expirationSeconds: 300, // 5 minutes (or undefined for infinite)
  * });
  * ```
  */
 export function declareSIWxExtension(options: DeclareSIWxOptions): Record<string, SIWxExtension> {
   // Generate time-based fields for standalone usage (tests, etc.)
   // enrichDeclaration hook will override these per-request when extension is registered
-  const expirationSeconds = options.expirationSeconds ?? 300;
+  const expirationSeconds = options.expirationSeconds;
   const nonce = randomBytes(16).toString("hex");
   const issuedAt = new Date().toISOString();
-  const expirationTime = new Date(Date.now() + expirationSeconds * 1000).toISOString();
 
   const info: SIWxExtensionInfo = {
     domain: options.domain,
@@ -64,9 +63,13 @@ export function declareSIWxExtension(options: DeclareSIWxOptions): Record<string
     type: getSignatureType(options.network),
     nonce,
     issuedAt,
-    expirationTime,
     resources: [options.resourceUri],
   };
+
+  // Only include expirationTime if duration specified (undefined = infinite)
+  if (expirationSeconds !== undefined) {
+    info.expirationTime = new Date(Date.now() + expirationSeconds * 1000).toISOString();
+  }
 
   // Add optional fields if provided
   if (options.statement) {
@@ -82,7 +85,7 @@ export function declareSIWxExtension(options: DeclareSIWxOptions): Record<string
       schema: buildSIWxSchema(),
       // Store metadata for enrichDeclaration hook
       _metadata: {
-        expirationSeconds: options.expirationSeconds ?? 300,
+        expirationSeconds: options.expirationSeconds, // undefined = infinite
       },
     } as SIWxExtension & { _metadata?: { expirationSeconds?: number } },
   };

@@ -57,6 +57,7 @@ function routeConfig(path: string) {
       domain: HOST,
       resourceUri: `http://${HOST}${path}`,
       network: NETWORK,
+      expirationSeconds: 300, // 5 minutes
     }),
   };
 }
