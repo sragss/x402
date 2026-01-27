@@ -8,6 +8,7 @@ import {
   parseSIWxHeader,
   encodeSIWxHeader,
   declareSIWxExtension,
+  declareSIWxExtensionMultiChain,
   siwxResourceServerExtension,
   validateSIWxMessage,
   createSIWxMessage,
@@ -1164,6 +1165,68 @@ describe("SIWX Hooks", () => {
       expect(storage.hasPaid("/premium", account1.address)).toBe(true);
       expect(storage.hasPaid("/premium", account2.address)).toBe(true);
       expect(storage.hasPaid("/premium", account3.address)).toBe(true);
+    });
+
+    it("should allow both EVM and Solana signers to authenticate to the same resource (multi-chain)", async () => {
+      const storage = new InMemorySIWxStorage();
+
+      // Create EVM and Solana wallets
+      const evmAccount = privateKeyToAccount(generatePrivateKey());
+      const solanaKeypair = nacl.sign.keyPair();
+      const solanaAddress = encodeBase58(solanaKeypair.publicKey);
+
+      // Both have paid for the same resource
+      storage.recordPayment("/premium", evmAccount.address);
+      storage.recordPayment("/premium", solanaAddress);
+
+      // Server declares multi-chain support
+      const extensions = declareSIWxExtensionMultiChain(
+        {
+          domain: "api.example.com",
+          resourceUri: "http://api.example.com/premium",
+        },
+        ["eip155:8453", SOLANA_DEVNET],
+      );
+
+      const hook = createSIWxRequestHook({ storage });
+
+      // Test EVM signer can authenticate using eip155 extension
+      const evmExtension = extensions["sign-in-with-x:eip155:8453"];
+      const evmPayload = await createSIWxPayload(evmExtension.info, evmAccount);
+      const evmResult = await hook({
+        adapter: {
+          getHeader: (name: string) =>
+            name === "sign-in-with-x" || name === "SIGN-IN-WITH-X"
+              ? encodeSIWxHeader(evmPayload)
+              : undefined,
+          getUrl: () => "http://api.example.com/premium",
+        },
+        path: "/premium",
+      });
+      expect(evmResult).toEqual({ grantAccess: true });
+
+      // Test Solana signer can authenticate using solana extension
+      const solanaSigner: SolanaSigner = {
+        signMessage: async (msg: Uint8Array) => nacl.sign.detached(msg, solanaKeypair.secretKey),
+        publicKey: { toBase58: () => solanaAddress },
+      };
+      const solanaExtension = extensions[`sign-in-with-x:${SOLANA_DEVNET}`];
+      const solanaPayload = await createSIWxPayload(solanaExtension.info, solanaSigner);
+      const solanaResult = await hook({
+        adapter: {
+          getHeader: (name: string) =>
+            name === "sign-in-with-x" || name === "SIGN-IN-WITH-X"
+              ? encodeSIWxHeader(solanaPayload)
+              : undefined,
+          getUrl: () => "http://api.example.com/premium",
+        },
+        path: "/premium",
+      });
+      expect(solanaResult).toEqual({ grantAccess: true });
+
+      // Verify both chains' addresses are tracked
+      expect(storage.hasPaid("/premium", evmAccount.address)).toBe(true);
+      expect(storage.hasPaid("/premium", solanaAddress)).toBe(true);
     });
 
     it("should emit validation_failed event on invalid signature", async () => {
