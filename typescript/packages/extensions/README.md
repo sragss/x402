@@ -475,13 +475,16 @@ const response = await fetch(url, {
 
 Creates the extension object for servers to include in PaymentRequired.
 
+Time-based fields (nonce, issuedAt, expirationTime) are automatically refreshed per-request when `siwxResourceServerExtension` is registered.
+
 ```typescript
 declareSIWxExtension({
-  resourceUri: string;           // Full resource URI (domain derived from this)
+  domain: string;                // Server's domain (must match request host)
+  resourceUri: string;           // Full resource URI
   network: string;               // CAIP-2 network (e.g., "eip155:8453")
   statement?: string;            // Human-readable purpose
   version?: string;              // CAIP-122 version (default: "1")
-  expirationTime?: string;       // Optional explicit expiry
+  expirationSeconds?: number;    // Expiration duration in seconds (default: 300 = 5 minutes)
   signatureScheme?: SignatureScheme;  // Hint for client
 })
 ```
