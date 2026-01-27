@@ -178,7 +178,6 @@ describe("Sign-In-With-X Extension", () => {
       });
 
       const originalNonce = declaration["sign-in-with-x"].info.nonce;
-      const originalIssuedAt = declaration["sign-in-with-x"].info.issuedAt;
 
       // Simulate enrichDeclaration being called on a request
       const enriched1 = siwxResourceServerExtension.enrichDeclaration!(

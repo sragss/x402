@@ -59,8 +59,7 @@ export interface CreateSIWxHookOptions {
 export type SIWxHookEvent =
   | { type: "payment_recorded"; resource: string; address: string }
   | { type: "access_granted"; resource: string; address: string }
-  | { type: "validation_failed"; resource: string; error?: string }
-  | { type: "siwx_header_sent"; resource: string };
+  | { type: "validation_failed"; resource: string; error?: string };
 
 /**
  * Creates an onAfterSettle hook that records payments for SIWX.
