@@ -8,6 +8,7 @@ import {
   parseSIWxHeader,
   encodeSIWxHeader,
   declareSIWxExtension,
+  siwxResourceServerExtension,
   validateSIWxMessage,
   createSIWxMessage,
   createSIWxPayload,
@@ -134,6 +135,97 @@ describe("Sign-In-With-X Extension", () => {
       expect(extension.info.issuedAt).toBeDefined();
       expect(extension.schema).toBeDefined();
     });
+
+    it("should support configurable expiration duration", () => {
+      const result = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "https://api.example.com/data",
+        network: "eip155:8453",
+        expirationSeconds: 600, // 10 minutes
+      });
+
+      const extension = result["sign-in-with-x"];
+      expect(extension.info.expirationTime).toBeDefined();
+
+      const issued = new Date(extension.info.issuedAt).getTime();
+      const expiry = new Date(extension.info.expirationTime!).getTime();
+      const duration = (expiry - issued) / 1000;
+
+      expect(duration).toBeGreaterThanOrEqual(599);
+      expect(duration).toBeLessThanOrEqual(601);
+    });
+
+    it("should support infinite expiration when expirationSeconds is undefined", () => {
+      const result = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "https://api.example.com/data",
+        network: "eip155:8453",
+        expirationSeconds: undefined, // Infinite
+      });
+
+      const extension = result["sign-in-with-x"];
+      expect(extension.info.expirationTime).toBeUndefined();
+    });
+  });
+
+  describe("siwxResourceServerExtension enrichDeclaration", () => {
+    it("should refresh time-based fields per-request", () => {
+      const declaration = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "https://api.example.com/data",
+        network: "eip155:8453",
+        expirationSeconds: 300,
+      });
+
+      const originalNonce = declaration["sign-in-with-x"].info.nonce;
+      const originalIssuedAt = declaration["sign-in-with-x"].info.issuedAt;
+
+      // Simulate enrichDeclaration being called on a request
+      const enriched1 = siwxResourceServerExtension.enrichDeclaration!(
+        declaration["sign-in-with-x"],
+        {},
+      ) as { info: { nonce: string; issuedAt: string; expirationTime: string } };
+
+      const enriched2 = siwxResourceServerExtension.enrichDeclaration!(
+        declaration["sign-in-with-x"],
+        {},
+      ) as { info: { nonce: string; issuedAt: string; expirationTime: string } };
+
+      // Each call should generate fresh values
+      expect(enriched1.info.nonce).not.toBe(originalNonce);
+      expect(enriched1.info.nonce).not.toBe(enriched2.info.nonce);
+      expect(enriched1.info.nonce.length).toBe(32);
+
+      // Timestamps should be recent
+      expect(enriched1.info.issuedAt).toBeDefined();
+      expect(enriched1.info.expirationTime).toBeDefined();
+
+      // Expiration should be ~5 minutes from now
+      const issued = new Date(enriched1.info.issuedAt).getTime();
+      const expiry = new Date(enriched1.info.expirationTime).getTime();
+      const duration = (expiry - issued) / 1000;
+      expect(duration).toBeGreaterThanOrEqual(299);
+      expect(duration).toBeLessThanOrEqual(301);
+    });
+
+    it("should handle infinite expiration (no expirationTime field)", () => {
+      const declaration = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "https://api.example.com/data",
+        network: "eip155:8453",
+        expirationSeconds: undefined, // Infinite
+      });
+
+      const enriched = siwxResourceServerExtension.enrichDeclaration!(
+        declaration["sign-in-with-x"],
+        {},
+      ) as { info: { nonce: string; issuedAt: string; expirationTime?: string } };
+
+      // Should have nonce and issuedAt but NOT expirationTime
+      expect(enriched.info.nonce).toBeDefined();
+      expect(enriched.info.issuedAt).toBeDefined();
+      expect(enriched.info.expirationTime).toBeUndefined();
+    });
   });
 
   describe("validateSIWxMessage", () => {
@@ -153,6 +245,40 @@ describe("Sign-In-With-X Extension", () => {
       const result = await validateSIWxMessage(validPayload, "https://different.example.com/data");
       expect(result.valid).toBe(false);
       expect(result.error).toContain("Domain mismatch");
+    });
+
+    it("should reject expired signatures", async () => {
+      const payload = {
+        ...validPayload,
+        issuedAt: new Date().toISOString(), // Recent (valid)
+        expirationTime: new Date(Date.now() - 1000).toISOString(), // 1 second ago (expired)
+      };
+
+      const result = await validateSIWxMessage(payload, "https://api.example.com/data");
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("expired");
+    });
+
+    it("should accept signatures without expiration (infinite)", async () => {
+      const payload = {
+        ...validPayload,
+        issuedAt: new Date().toISOString(),
+        expirationTime: undefined, // No expiration
+      };
+
+      const result = await validateSIWxMessage(payload, "https://api.example.com/data");
+      expect(result.valid).toBe(true);
+    });
+
+    it("should accept signatures issued long ago if no expiration set", async () => {
+      const payload = {
+        ...validPayload,
+        issuedAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year ago
+        expirationTime: undefined, // Infinite expiration
+      };
+
+      const result = await validateSIWxMessage(payload, "https://api.example.com/data");
+      expect(result.valid).toBe(true);
     });
   });
 
