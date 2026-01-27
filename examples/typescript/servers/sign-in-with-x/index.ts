@@ -40,7 +40,16 @@ const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 const resourceServer = new x402ResourceServer(facilitatorClient)
   .register(NETWORK, new ExactEvmScheme())
   .registerExtension(siwxResourceServerExtension) // Register extension for time-based field refresh
-  .onAfterSettle(createSIWxSettleHook({ storage }));
+  .onAfterSettle(
+    createSIWxSettleHook({
+      storage,
+      onEvent: event => {
+        if (event.type === "payment_recorded") {
+          console.log(`Payment recorded: ${event.address} for ${event.resource}`);
+        }
+      },
+    }),
+  );
 
 /**
  * Creates route configuration with SIWX extension.
@@ -69,7 +78,14 @@ const routes = {
 
 // Configure HTTP server with SIWX request hook
 const httpServer = new x402HTTPResourceServer(resourceServer, routes).onProtectedRequest(
-  createSIWxRequestHook({ storage }),
+  createSIWxRequestHook({
+    storage,
+    onEvent: event => {
+      if (event.type === "access_granted") {
+        console.log(`SIWX auth: ${event.address} for ${event.resource}`);
+      }
+    },
+  }),
 );
 
 const app = express();
