@@ -192,22 +192,24 @@ export function createSIWxClientHook(signer: SIWxSigner) {
   }): Promise<{ headers: Record<string, string> } | void> => {
     const extensions = context.paymentRequired.extensions ?? {};
 
-    // First try simple key (backward compatibility)
+    // Support both single-chain and multi-chain servers:
+    // - Single-chain: declareSIWxExtension() → "sign-in-with-x" key
+    // - Multi-chain: declareSIWxExtensionMultiChain() → "sign-in-with-x:eip155:8453" keys
     let siwxExtension = extensions[SIGN_IN_WITH_X] as { info: SIWxExtensionInfo } | undefined;
 
-    // If not found, search for namespaced key matching signer's chain type
+    // If simple key not found, search for namespaced key matching signer's chain type
     if (!siwxExtension?.info) {
       // Determine chain type from signer properties
       const isEVM = "address" in signer || "account" in signer;
       const chainPrefix = isEVM ? "eip155:" : "solana:";
 
-      // Search for matching extension by chain prefix
+      // Find matching extension by chain prefix
       for (const [key, value] of Object.entries(extensions)) {
         if (key.startsWith(SIGN_IN_WITH_X)) {
           const ext = value as { info: SIWxExtensionInfo };
           if (ext.info?.chainId.startsWith(chainPrefix)) {
             siwxExtension = ext;
-            break; // Use first matching chain type
+            break;
           }
         }
       }
