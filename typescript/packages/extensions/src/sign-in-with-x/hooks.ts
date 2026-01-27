@@ -124,7 +124,17 @@ export function createSIWxRequestHook(options: CreateSIWxHookOptions) {
       const payload = parseSIWxHeader(header);
       const resourceUri = context.adapter.getUrl();
 
-      const validation = await validateSIWxMessage(payload, resourceUri);
+      // Build validation options with nonce checking if storage supports it
+      const validationOptions = storage.hasUsedNonce
+        ? {
+            checkNonce: async (nonce: string) => {
+              const used = await storage.hasUsedNonce!(nonce);
+              return !used; // Return false if nonce was used (validation fails)
+            },
+          }
+        : undefined;
+
+      const validation = await validateSIWxMessage(payload, resourceUri, validationOptions);
       if (!validation.valid) {
         onEvent?.({ type: "validation_failed", resource: context.path, error: validation.error });
         return;
@@ -138,6 +148,11 @@ export function createSIWxRequestHook(options: CreateSIWxHookOptions) {
 
       const hasPaid = await storage.hasPaid(context.path, verification.address);
       if (hasPaid) {
+        // Record nonce after successful verification to prevent replay
+        if (storage.recordNonce) {
+          await storage.recordNonce(payload.nonce);
+        }
+
         onEvent?.({
           type: "access_granted",
           resource: context.path,
@@ -158,6 +173,10 @@ export function createSIWxRequestHook(options: CreateSIWxHookOptions) {
 /**
  * Creates an onPaymentRequired hook for client-side SIWX authentication.
  *
+ * Supports both single-chain and multi-chain servers:
+ * - Single-chain: Looks for 'sign-in-with-x' extension
+ * - Multi-chain: Searches for 'sign-in-with-x:*' extensions matching signer's chainId
+ *
  * @param signer - Wallet signer for creating SIWX proofs
  * @returns Hook function for x402HTTPClient.onPaymentRequired()
  *
@@ -171,9 +190,30 @@ export function createSIWxClientHook(signer: SIWxSigner) {
   return async (context: {
     paymentRequired: { extensions?: Record<string, unknown> };
   }): Promise<{ headers: Record<string, string> } | void> => {
-    const siwxExtension = context.paymentRequired.extensions?.[SIGN_IN_WITH_X] as
+    const extensions = context.paymentRequired.extensions ?? {};
+
+    // First try simple key (backward compatibility)
+    let siwxExtension = extensions[SIGN_IN_WITH_X] as
       | { info: SIWxExtensionInfo }
       | undefined;
+
+    // If not found, search for namespaced key matching signer's chain type
+    if (!siwxExtension?.info) {
+      // Determine chain type from signer properties
+      const isEVM = "address" in signer || "account" in signer;
+      const chainPrefix = isEVM ? "eip155:" : "solana:";
+
+      // Search for matching extension by chain prefix
+      for (const [key, value] of Object.entries(extensions)) {
+        if (key.startsWith(SIGN_IN_WITH_X)) {
+          const ext = value as { info: SIWxExtensionInfo };
+          if (ext.info?.chainId.startsWith(chainPrefix)) {
+            siwxExtension = ext;
+            break; // Use first matching chain type
+          }
+        }
+      }
+    }
 
     if (!siwxExtension?.info) return;
 

@@ -146,8 +146,11 @@ export interface DeclareSIWxOptions {
    * - Solana: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp" (mainnet)
    */
   network: `eip155:${string}` | `solana:${string}` | (string & {});
-  /** Optional explicit expiration time */
-  expirationTime?: string;
+  /**
+   * Optional expiration duration in seconds (default: 300 = 5 minutes).
+   * The actual expirationTime timestamp is generated per-request by enrichDeclaration hook.
+   */
+  expirationSeconds?: number;
   /** Signature scheme hint (informational) */
   signatureScheme?: SignatureScheme;
 }
