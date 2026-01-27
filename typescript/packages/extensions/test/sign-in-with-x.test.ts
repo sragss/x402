@@ -8,7 +8,6 @@ import {
   parseSIWxHeader,
   encodeSIWxHeader,
   declareSIWxExtension,
-  declareSIWxExtensionMultiChain,
   siwxResourceServerExtension,
   validateSIWxMessage,
   createSIWxMessage,
@@ -1179,14 +1178,12 @@ describe("SIWX Hooks", () => {
       storage.recordPayment("/premium", evmAccount.address);
       storage.recordPayment("/premium", solanaAddress);
 
-      // Server declares multi-chain support
-      const extensions = declareSIWxExtensionMultiChain(
-        {
-          domain: "api.example.com",
-          resourceUri: "http://api.example.com/premium",
-        },
-        ["eip155:8453", SOLANA_DEVNET],
-      );
+      // Server declares multi-chain support using array
+      const extensions = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "http://api.example.com/premium",
+        network: ["eip155:8453", SOLANA_DEVNET],
+      });
 
       const hook = createSIWxRequestHook({ storage });
 

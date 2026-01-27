@@ -20,116 +20,85 @@ function getSignatureType(network: string): SignatureType {
 }
 
 /**
- * Create a SIWX extension declaration for PaymentRequired.extensions
+ * Create SIWX extension declaration(s) for PaymentRequired.extensions
+ *
+ * Supports both single-chain and multi-chain configurations:
+ * - Single-chain: Pass string for network → Returns { "sign-in-with-x": {...} }
+ * - Multi-chain: Pass array for network → Returns { "sign-in-with-x:eip155:8453": {...}, ... }
  *
  * Time-based fields (nonce, issuedAt, expirationTime) are generated per-request
  * by the enrichDeclaration hook when siwxResourceServerExtension is registered.
  *
  * @param options - Configuration options
- * @returns Extension object ready for PaymentRequired.extensions
+ * @returns Extension object(s) ready for PaymentRequired.extensions
  *
  * @example
  * ```typescript
- * import {
- *   declareSIWxExtension,
- *   siwxResourceServerExtension
- * } from "@x402/extensions/sign-in-with-x";
- *
- * // Register extension for time-based field refresh
- * const resourceServer = new x402ResourceServer(facilitator)
- *   .registerExtension(siwxResourceServerExtension);
- *
+ * // Single-chain
  * const extensions = declareSIWxExtension({
  *   domain: 'api.example.com',
  *   resourceUri: 'https://api.example.com/data',
  *   network: 'eip155:8453',
- *   statement: 'Sign in to access your purchased content',
- *   expirationSeconds: 300, // 5 minutes (or undefined for infinite)
+ *   expirationSeconds: 300,
+ * });
+ *
+ * // Multi-chain (EVM + Solana)
+ * const extensions = declareSIWxExtension({
+ *   domain: 'api.example.com',
+ *   resourceUri: 'https://api.example.com/data',
+ *   network: ['eip155:8453', 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'],
+ *   expirationSeconds: 300,
  * });
  * ```
  */
 export function declareSIWxExtension(options: DeclareSIWxOptions): Record<string, SIWxExtension> {
-  // Generate time-based fields for standalone usage (tests, etc.)
-  // enrichDeclaration hook will override these per-request when extension is registered
-  const expirationSeconds = options.expirationSeconds;
-  const nonce = randomBytes(16).toString("hex");
-  const issuedAt = new Date().toISOString();
+  const networks = Array.isArray(options.network) ? options.network : [options.network];
+  const isSingleChain = !Array.isArray(options.network);
 
-  const info: SIWxExtensionInfo = {
-    domain: options.domain,
-    uri: options.resourceUri,
-    version: options.version ?? "1",
-    chainId: options.network,
-    type: getSignatureType(options.network),
-    nonce,
-    issuedAt,
-    resources: [options.resourceUri],
-  };
-
-  // Only include expirationTime if duration specified (undefined = infinite)
-  if (expirationSeconds !== undefined) {
-    info.expirationTime = new Date(Date.now() + expirationSeconds * 1000).toISOString();
-  }
-
-  // Add optional fields if provided
-  if (options.statement) {
-    info.statement = options.statement;
-  }
-  if (options.signatureScheme) {
-    info.signatureScheme = options.signatureScheme;
-  }
-
-  return {
-    [SIGN_IN_WITH_X]: {
-      info,
-      schema: buildSIWxSchema(),
-      // Store metadata for enrichDeclaration hook
-      _metadata: {
-        expirationSeconds: options.expirationSeconds, // undefined = infinite
-      },
-    } as SIWxExtension & { _metadata?: { expirationSeconds?: number } },
-  };
-}
-
-/**
- * Create multiple SIWX extension declarations for multi-chain support.
- *
- * Servers supporting multiple chains can use this helper to declare authentication
- * requirements for each supported network. Each chain gets a namespaced extension key.
- *
- * @param baseOptions - Common options (domain, resourceUri, statement, etc.)
- * @param networks - Array of CAIP-2 network identifiers
- * @returns Extensions map with namespaced keys for each chain
- *
- * @example
- * ```typescript
- * const extensions = declareSIWxExtensionMultiChain(
- *   {
- *     domain: 'api.example.com',
- *     resourceUri: 'https://api.example.com/data',
- *     statement: 'Sign in to access your purchased content',
- *     expirationSeconds: 300,
- *   },
- *   ['eip155:8453', 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp']
- * );
- * // Returns:
- * // {
- * //   'sign-in-with-x:eip155:8453': { info: {...}, schema: {...} },
- * //   'sign-in-with-x:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp': { info: {...}, schema: {...} }
- * // }
- * ```
- */
-export function declareSIWxExtensionMultiChain(
-  baseOptions: Omit<DeclareSIWxOptions, "network">,
-  networks: string[],
-): Record<string, SIWxExtension> {
   const extensions: Record<string, SIWxExtension> = {};
 
   for (const network of networks) {
-    const ext = declareSIWxExtension({ ...baseOptions, network });
-    // Use namespaced key: "sign-in-with-x:eip155:8453"
-    const namespacedKey = `${SIGN_IN_WITH_X}:${network}`;
-    extensions[namespacedKey] = ext[SIGN_IN_WITH_X];
+    // Generate time-based fields for standalone usage (tests, etc.)
+    // enrichDeclaration hook will override these per-request when extension is registered
+    const expirationSeconds = options.expirationSeconds;
+    const nonce = randomBytes(16).toString("hex");
+    const issuedAt = new Date().toISOString();
+
+    const info: SIWxExtensionInfo = {
+      domain: options.domain,
+      uri: options.resourceUri,
+      version: options.version ?? "1",
+      chainId: network,
+      type: getSignatureType(network),
+      nonce,
+      issuedAt,
+      resources: [options.resourceUri],
+    };
+
+    // Only include expirationTime if duration specified (undefined = infinite)
+    if (expirationSeconds !== undefined) {
+      info.expirationTime = new Date(Date.now() + expirationSeconds * 1000).toISOString();
+    }
+
+    // Add optional fields if provided
+    if (options.statement) {
+      info.statement = options.statement;
+    }
+    if (options.signatureScheme) {
+      info.signatureScheme = options.signatureScheme;
+    }
+
+    const extension: SIWxExtension & { _metadata?: { expirationSeconds?: number } } = {
+      info,
+      schema: buildSIWxSchema(),
+      _metadata: {
+        expirationSeconds: options.expirationSeconds,
+      },
+    };
+
+    // Use simple key for single-chain, namespaced key for multi-chain
+    const key = isSingleChain ? SIGN_IN_WITH_X : `${SIGN_IN_WITH_X}:${network}`;
+    extensions[key] = extension;
   }
 
   return extensions;

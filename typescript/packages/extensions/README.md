@@ -481,7 +481,7 @@ Time-based fields (nonce, issuedAt, expirationTime) are automatically refreshed 
 declareSIWxExtension({
   domain: string;                // Server's domain (must match request host)
   resourceUri: string;           // Full resource URI
-  network: string;               // CAIP-2 network (e.g., "eip155:8453")
+  network: string | string[];    // CAIP-2 network(s) - string for single, array for multi-chain
   statement?: string;            // Human-readable purpose
   version?: string;              // CAIP-122 version (default: "1")
   expirationSeconds?: number;    // Expiration duration (300 = 5 min, undefined = infinite)
@@ -489,16 +489,31 @@ declareSIWxExtension({
 })
 ```
 
-**Expiration Examples:**
+**Examples:**
 ```typescript
-// Short-lived (5 minutes) - high-security resources
-declareSIWxExtension({ ..., expirationSeconds: 300 })
+// Single-chain (EVM only)
+declareSIWxExtension({
+  domain: 'api.example.com',
+  resourceUri: 'https://api.example.com/data',
+  network: 'eip155:8453',
+  expirationSeconds: 300, // 5 minutes
+})
 
-// Long-lived (30 days) - subscription-like access
-declareSIWxExtension({ ..., expirationSeconds: 30 * 24 * 60 * 60 })
+// Multi-chain (EVM + Solana)
+declareSIWxExtension({
+  domain: 'api.example.com',
+  resourceUri: 'https://api.example.com/data',
+  network: ['eip155:8453', 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'],
+  expirationSeconds: 30 * 24 * 60 * 60, // 30 days
+})
 
-// Infinite - once paid, access forever
-declareSIWxExtension({ ..., expirationSeconds: undefined })
+// Infinite expiration (subscription-like access)
+declareSIWxExtension({
+  domain: 'api.example.com',
+  resourceUri: 'https://api.example.com/data',
+  network: 'eip155:8453',
+  expirationSeconds: undefined, // Once paid, access forever
+})
 ```
 
 #### `parseSIWxHeader(header)`

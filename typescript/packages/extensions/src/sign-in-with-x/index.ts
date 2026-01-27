@@ -89,7 +89,7 @@ export type {
 } from "./types";
 
 // Server
-export { declareSIWxExtension, declareSIWxExtensionMultiChain } from "./declare";
+export { declareSIWxExtension } from "./declare";
 export { siwxResourceServerExtension } from "./server";
 export { parseSIWxHeader } from "./parse";
 export { validateSIWxMessage } from "./validate";
