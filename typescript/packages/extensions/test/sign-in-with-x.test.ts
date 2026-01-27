@@ -1088,6 +1088,84 @@ describe("SIWX Hooks", () => {
       expect(result).toBeUndefined();
     });
 
+    it("should allow multiple different signers to authenticate to the same resource", async () => {
+      const storage = new InMemorySIWxStorage();
+
+      // Create three different wallets
+      const account1 = privateKeyToAccount(generatePrivateKey());
+      const account2 = privateKeyToAccount(generatePrivateKey());
+      const account3 = privateKeyToAccount(generatePrivateKey());
+
+      // All three have paid for the same resource
+      storage.recordPayment("/premium", account1.address);
+      storage.recordPayment("/premium", account2.address);
+      storage.recordPayment("/premium", account3.address);
+
+      const hook = createSIWxRequestHook({ storage });
+
+      // Test account1 can authenticate (with unique nonce from fresh declaration)
+      const ext1 = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "http://api.example.com/premium",
+        network: "eip155:8453",
+      });
+      const payload1 = await createSIWxPayload(ext1["sign-in-with-x"].info, account1);
+      const result1 = await hook({
+        adapter: {
+          getHeader: (name: string) =>
+            name === "sign-in-with-x" || name === "SIGN-IN-WITH-X"
+              ? encodeSIWxHeader(payload1)
+              : undefined,
+          getUrl: () => "http://api.example.com/premium",
+        },
+        path: "/premium",
+      });
+      expect(result1).toEqual({ grantAccess: true });
+
+      // Test account2 can authenticate independently (with unique nonce)
+      const ext2 = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "http://api.example.com/premium",
+        network: "eip155:8453",
+      });
+      const payload2 = await createSIWxPayload(ext2["sign-in-with-x"].info, account2);
+      const result2 = await hook({
+        adapter: {
+          getHeader: (name: string) =>
+            name === "sign-in-with-x" || name === "SIGN-IN-WITH-X"
+              ? encodeSIWxHeader(payload2)
+              : undefined,
+          getUrl: () => "http://api.example.com/premium",
+        },
+        path: "/premium",
+      });
+      expect(result2).toEqual({ grantAccess: true });
+
+      // Test account3 can authenticate independently (with unique nonce)
+      const ext3 = declareSIWxExtension({
+        domain: "api.example.com",
+        resourceUri: "http://api.example.com/premium",
+        network: "eip155:8453",
+      });
+      const payload3 = await createSIWxPayload(ext3["sign-in-with-x"].info, account3);
+      const result3 = await hook({
+        adapter: {
+          getHeader: (name: string) =>
+            name === "sign-in-with-x" || name === "SIGN-IN-WITH-X"
+              ? encodeSIWxHeader(payload3)
+              : undefined,
+          getUrl: () => "http://api.example.com/premium",
+        },
+        path: "/premium",
+      });
+      expect(result3).toEqual({ grantAccess: true });
+
+      // Verify all three are tracked in storage
+      expect(storage.hasPaid("/premium", account1.address)).toBe(true);
+      expect(storage.hasPaid("/premium", account2.address)).toBe(true);
+      expect(storage.hasPaid("/premium", account3.address)).toBe(true);
+    });
+
     it("should emit validation_failed event on invalid signature", async () => {
       const storage = new InMemorySIWxStorage();
       const events: unknown[] = [];
