@@ -27,7 +27,7 @@ import { SIGN_IN_WITH_X } from "./types";
 export const siwxResourceServerExtension: ResourceServerExtension = {
   key: SIGN_IN_WITH_X,
 
-  enrichDeclaration: (declaration: unknown) => {
+  enrichDeclaration: (declaration, _transportContext) => {
     const extension = declaration as SIWxExtension & { _metadata?: { expirationSeconds?: number } };
 
     // Refresh time-based fields per request to prevent expiration
